@@ -1,0 +1,14 @@
+# Ignore local data assets (Never push heavy PDFs to GitHub)
+data/*
+!data/.gitkeep
+
+# Ignore Python environment and cache files
+__pycache__/
+*.pyc
+.env
+venv/
+.pytest_cache/
+
+# Ignore system specific files
+.DS_Store
+Thumbs.db
