@@ -9,3 +9,4 @@ pydantic-settings==2.2.1
 python-multipart==0.0.9
 sentence-transformers==2.7.0
 pypdf==4.2.0
+llama-index-readers-file
