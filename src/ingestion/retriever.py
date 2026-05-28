@@ -15,19 +15,17 @@ class ComplianceRetriever:
     Combines sub-millisecond Regex Intent Routing with strict 
     Database Metadata Pre-Filtering for secure, role-aware context extraction.
     """
-    def __init__(self):
+    # Look for the __init__ method in src/ingestion/retriever.py and update it to this:
+    def __init__(self, client: QdrantClient = None):
         logger.info("Initializing Local Retrieval Search Engine...")
-        
-        # 1. Load the local cached embedding model (BGE-small-en-v1.5)
         self.embed_model = HuggingFaceEmbedding(
             model_name=settings.EMBED_MODEL_NAME,
             cache_folder="./model_cache"
         )
         
-        # 2. Connect directly to the local disk-backed Qdrant database
-        self.client = QdrantClient(path=str(settings.QDRANT_PATH))
+        # Share the database client connection to avoid locker collisions
+        self.client = client if client else QdrantClient(path=str(settings.QDRANT_PATH))
 
-        # 3. Pre-compile the corporate taxonomy pattern for lightning-fast matching
         self.compliance_pattern = re.compile(
             r"(risk|compliance|regulatory|supply chain|manufacturing|market|audit|"
             r"financial|revenue|sec|filing|legal|disclosure|policy|guideline|report|laws|apple|nvidia)", 

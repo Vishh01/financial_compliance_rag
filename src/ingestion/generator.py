@@ -1,100 +1,102 @@
 import logging
-import requests
 import json
 import sys
+import time
+import asyncio
+import httpx
+from qdrant_client import QdrantClient
 
 from src.ingestion.retriever import ComplianceRetriever
-# Import the new deconstructor
 from src.ingestion.query_validator import QueryDeconstructor
+from src.ingestion.semantic_cache import SemanticCache
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-class ComplianceRAGPipeline:
+class AsyncComplianceRAGPipeline:
     def __init__(self):
-        self.retriever = ComplianceRetriever()
-        self.deconstructor = QueryDeconstructor() # Initialize the gatekeeper
+        logger.info("Initializing High-Performance Asynchronous RAG Pipeline...")
+        self.shared_client = QdrantClient(path=str(settings.QDRANT_PATH))
+        
+        self.retriever = ComplianceRetriever(client=self.shared_client)
+        self.cache = SemanticCache(client=self.shared_client, threshold=0.95)
+        self.deconstructor = QueryDeconstructor()
+        
         self.model_name = settings.LLM_MODEL
         self.ollama_url = f"{settings.OLLAMA_BASE_URL}/api/generate"
 
-    def query(self, user_question: str, user_role: str = "public"):
+    async def async_retrieve_worker(self, sub_query: str, user_role: str):
+        """Worker task running completely concurrently for database lookups."""
+        logger.info(f"Async worker spawned for target: '{sub_query}'")
+        # Run the existing retriever inside the async thread pool
+        return self.retriever.retrieve_context(query=sub_query, user_role=user_role, limit=2)
+
+    async def query(self, user_question: str, user_role: str = "compliance_auditor"):
         print(f"\n--- Processing Ingress Query [Role: {user_role.upper()}] ---")
+        start_time = time.time()
         
-        # 1. RUN PRE-QUERY VALIDATION AND DECONSTRUCTION
-        # Breaks down compound questions into an iterable list
+        # 1. High-Speed Semantic Cache Pass
+        cached_answer = self.cache.check_cache(user_question)
+        if cached_answer:
+            print(f"\n[FAST RESPONSE FROM CACHE Memory]:\n{cached_answer}")
+            print(f"\n--- Pipeline Completed via Cache in {(time.time() - start_time)*1000:.2f}ms ---\n")
+            return
+
+        # 2. Fast Micro-Model Query Deconstruction
         sub_queries = self.deconstructor.validate_and_deconstruct(user_question)
-        
+        print(f"Targets to search in parallel: {sub_queries}")
+
+        # 3. ASYNCHRONOUS VECTOR PARALLELISM
+        # Fires off all vector database searches SIMULTANEOUSLY
+        tasks = [self.async_retrieve_worker(sub_q, user_role) for sub_q in sub_queries]
+        retrieval_responses = await asyncio.gather(*tasks)
+
         aggregated_context_chunks = []
-        seen_payloads = set() # Prevent duplicate text blocks if queries overlap
+        seen_payloads = set()
 
-        # 2. RUN SEARCH LOOP ACROSS ALL ATOMIC SUB-QUERIES
-        for sub_q in sub_queries:
-            logger.info(f"Executing secure routing pass for sub-target: '{sub_q}'")
-            retrieval_response = self.retriever.retrieve_context(
-                query=sub_q, 
-                user_role=user_role, 
-                limit=2 # Grab top 2 highly specific chunks per sub-topic
-            )
-            
-            if retrieval_response["status"] == "blocked":
-                print(f"\n[SYSTEM GUARDRAIL BLOCK]: {retrieval_response['message']}\n")
+        # Consolidate results cleanly
+        for response in retrieval_responses:
+            if response["status"] == "blocked":
+                print(f"\n[SYSTEM GUARDRAIL BLOCK]: {response['message']}\n")
                 return
-
-            # Append unique chunks to our context window pool
-            for chunk in retrieval_response["context"]:
-                # Unique identifier based on document source and text content snippet
+            for chunk in response["context"]:
                 chunk_id = f"{chunk['source']}_{chunk['page']}_{hash(chunk['text'])}"
                 if chunk_id not in seen_payloads:
                     seen_payloads.add(chunk_id)
                     aggregated_context_chunks.append(chunk)
 
-        # 3. Format aggregated unique contexts for presentation to the LLM
-        formatted_context = ""
-        for chunk in aggregated_context_chunks:
-            formatted_context += f"--- Source Document: {chunk['source']} (Page {chunk['page']}) ---\n"
-            formatted_context += f"Context Block:\n{chunk['text']}\n\n"
+        # 4. Construct Prompt Context
+        formatted_context = "".join([
+            f"--- Source Document: {c['source']} (Page {c['page']}) ---\nContext:\n{c['text']}\n\n"
+            for c in aggregated_context_chunks
+        ])
 
-        # 4. Prompt Synthesis & Execution
         system_prompt = (
-            "You are an elite corporate financial compliance auditor. Your task is to answer the user's question "
-            "using ONLY the provided text blocks below. Adhere strictly to these execution constraints:\n"
-            "1. Ground your answer entirely in the provided context. Do not extrapolate or assume facts.\n"
-            "2. Cite the exact Source Document and Page numbers inline when presenting facts.\n"
-            "3. Maintain an objective, professional, analytical corporate tone."
+            "You are an elite corporate financial compliance auditor. Answer the question using ONLY the provided text blocks.\n"
+            "Cite the exact Source Document and Page numbers inline. Do not extrapolate."
         )
+        full_prompt = f"{system_prompt}\n\n=== CONTEXT ===\n{formatted_context}\n=== QUESTION ===\n{user_question}\nRESPONSE:"
 
-        full_prompt = (
-            f"{system_prompt}\n\n"
-            f"=== TARGET REFERENCE CONTEXT ===\n"
-            f"{formatted_context}\n"
-            f"=================================\n\n"
-            f"USER QUESTION: {user_question}\n"
-            f"SMART COMPLIANCE RESPONSE:"
-        )
-
-        payload = {
-            "model": self.model_name,
-            "prompt": full_prompt,
-            "stream": True
-        }
-
+        # 5. Execute Async LLM Generation Pass via HTTPX
         print(f"\n[LLM GENERATION STARTING VIA OLLAMA ({self.model_name})]:")
-        try:
-            response = requests.post(self.ollama_url, json=payload, stream=True)
-            response.raise_for_status()
-            for line in response.iter_lines():
-                if line:
-                    chunk_json = json.loads(line.decode("utf-8"))
-                    sys.stdout.write(chunk_json.get("response", ""))
-                    sys.stdout.flush()
-            print("\n\n--- End of Generation Pass ---\n")
-        except requests.exceptions.ConnectionError:
-            print(f"\nERROR: Unable to connect to local Ollama instance at {self.ollama_url}.\n")
+        payload = {"model": self.model_name, "prompt": full_prompt, "stream": False}
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(self.ollama_url, json=payload, timeout=60.0)
+                final_text = response.json().get("response", "").strip()
+                print(final_text)
+                
+                print(f"\n--- Full Async RAG Pipeline Sequence Completed in {time.time() - start_time:.2f} seconds ---")
+                self.cache.update_cache(user_question, final_text)
+            except Exception as e:
+                print(f"\nExecution Error: {str(e)}\n")
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    rag_system = ComplianceRAGPipeline()
+    logging.basicConfig(level=logging.ERROR)
     
-    # A heavy compound question requiring data from multiple distinct files
+    rag_system = AsyncComplianceRAGPipeline()
     target_query = "What are the regulatory litigations for Apple and what are the chip supply chain concerns for Nvidia?"
-    rag_system.query(user_question=target_query, user_role="compliance_auditor")
+    
+    # Run the asynchronous framework loop
+    asyncio.run(rag_system.query(user_question=target_query, user_role="compliance_auditor"))

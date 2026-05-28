@@ -9,10 +9,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "Financial Compliance RAG Engine"
     API_PORT: int = 8000
     
-    # Local AI Stack Components (Optimized for 6GB RAM)
+     # Local AI Stack Components (Optimized for 6GB RAM)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    LLM_MODEL: str = "qwen2.5:1.5b"  
+    LLM_MODEL: str = "qwen2.5:1.5b"  # For heavy synthesis answering
     EMBED_MODEL_NAME: str = "BAAI/bge-small-en-v1.5"
+    ROUTER_MODEL: str = "llama3.2:1b"  # For lightning-fast query splitting
     
     # Local Storage & Vector Database (Embedded Mode - No Docker Needed!)
     QDRANT_PATH: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "qdrant_storage")
