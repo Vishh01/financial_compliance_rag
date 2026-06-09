@@ -1,12 +1,28 @@
+# Core Web API Service Stack
 fastapi==0.111.0
 uvicorn==0.30.1
+python-multipart==0.0.9
+httpx==0.27.0
+
+# Interactive Frontend UI Dashboard
+streamlit==1.35.0
+
+# Advanced Ingestion, Tokenization, & Vector Routing Engine
 llama-index-core==0.10.45
 llama-index-llms-ollama==0.1.2
 llama-index-vector-stores-qdrant==0.2.0
+llama-index-readers-file
 qdrant-client==1.9.1
+pypdf==4.2.0
+
+# Deep Neural Network Reranking & Embedding Matrices
+sentence-transformers==2.7.0
+
+# Deterministic Schema Verification & Settings Management
 pydantic==2.7.2
 pydantic-settings==2.2.1
-python-multipart==0.0.9
-sentence-transformers==2.7.0
-pypdf==4.2.0
-llama-index-readers-file
+typing-extensions==4.11.0
+
+# Algorithmic RAG Pipeline Evaluation Framework
+ragas==0.1.7
+datasets==2.19.2
