@@ -1,65 +1,151 @@
-import streamlit as st
+import streamlit as str_ui
 import requests
+import time
+import logging
 
-# Base HTML headers styling injected directly into web view engine layout
-st.markdown("""
-    <style>
-    .compliance-label { font-size: 1.15rem; font-weight: 600; color: #1E293B; margin-bottom: 4px; }
-    .success-banner { font-weight: bold; color: #15803D; font-size: 1.1rem; margin-top: 10px; }
-    .report-header { font-size: 1.5rem; font-weight: 700; color: #0F172A; margin-top: 15px; margin-bottom: 5px; }
-    .report-sub-caption { font-size: 0.95rem; color: #475569; font-style: italic; margin-bottom: 15px; }
-    .report-body { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 18px; border-radius: 6px; color: #334155; font-size: 1.05rem; line-height: 1.6; font-family: sans-serif; }
-    .security-body { background-color: #FFF5F5; border: 1px solid #FEB2B2; padding: 18px; border-radius: 6px; color: #9B2C2C; font-size: 1.05rem; line-height: 1.6; font-family: monospace; }
-    </style>
-""", unsafe_allow_html=True)
+# Setup structural logging for UI layer tracking
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-st.markdown('<p class="compliance-label">Enter Ingress Compliance Query:</p>', unsafe_allow_html=True)
+API_BASE_URL = "http://127.0.0.1:8000"
 
-# --- SIDEBAR DIAGNOSTICS ---
-try:
-    health_check = requests.get("http://127.0.0.1:8000/health", timeout=2)
-    if health_check.status_code == 200:
-        st.sidebar.markdown('<p style="color:#16A34A; font-weight:bold; margin:0;">● FastAPI Vector Engine Hot</p>', unsafe_allow_html=True)
-        engine_ready = True
+str_ui.set_page_config(
+    page_title="Financial Governance RAG Dashboard",
+    page_icon="🛡️",
+    layout="wide"
+)
+
+# ─── SIDEBAR: APPLICATION INFORMATION & VECTOR ENGINE STATUS ───
+with str_ui.sidebar:
+    str_ui.title("🛡️ Governance Control Center")
+    str_ui.markdown("---")
+    
+    str_ui.subheader("📌 Application Profiles")
+    str_ui.info(
+        "**Engine Type:** Enterprise Advanced RAG\n\n"
+        "**Compliance Target:** SEC Form 10-K Disclosures\n\n"
+        "**Security Layer:** Local Attribute-Based Access Control (ABAC)"
+    )
+    
+    str_ui.markdown("---")
+    str_ui.subheader("⚙️ Vector Engine Monitor")
+    
+    # Live health handshake checking system state
+    try:
+        health_response = requests.get(f"{API_BASE_URL}/health", timeout=2)
+        if health_response.status_code == 200 and health_response.json().get("status") == "healthy":
+            str_ui.success("● ENGINE STATUS: ONLINE / HOT")
+            str_ui.caption("Qdrant Embedded DB and Local Transformers are fully active.")
+        else:
+            str_ui.warning("● ENGINE STATUS: WARMING UP")
+            str_ui.caption("Models are initializing or caching layers are resident loading.")
+    except Exception:
+        str_ui.error("● ENGINE STATUS: OFFLINE")
+        str_ui.caption("Unable to establish communication network with FastAPI router backend.")
+
+    str_ui.markdown("---")
+    str_ui.caption("v2.0.0 • Production Hardened State Enforced")
+
+
+# ─── MAIN PRESENTATION FRAME ───
+str_ui.title("Financial Compliance Audit Engine")
+str_ui.write("Execute advanced cross-entity compliance sweeps with zero parametric hallucination.")
+str_ui.markdown("---")
+
+# 1. User Role Selector Layer placed directly ABOVE the query text input block
+str_ui.subheader("🔐 Step 1: Enforce Security Profile")
+user_role = str_ui.selectbox(
+    "Select Current Identity Profile (ABAC Enforcement Routing Key):",
+    options=["compliance_auditor", "guest_researcher"],
+    index=0,
+    help="Auditors have clearance for public and internal files; Researchers are strictly constrained to public records."
+)
+
+str_ui.markdown(" ")
+
+# 2. Ingress Input Block Section
+str_ui.subheader("🔍 Step 2: Formulate Audit Inquiry")
+user_query = str_ui.text_area(
+    "Enter Ingress Compliance Query:",
+    placeholder="e.g., Explain how nvidia works or evaluate supply chain risks and revenue streams...",
+    height=100
+)
+
+# Initialize persistent session tracking structures for metrics
+if "final_report" not in str_ui.session_state:
+    str_ui.session_state.final_report = None
+if "execution_latency" not in str_ui.session_state:
+    str_ui.session_state.execution_latency = None
+if "status_code" not in str_ui.session_state:
+    str_ui.session_state.status_code = None
+
+# Action execution boundary
+if str_ui.button("Execute Compliance Evaluation Sequence", type="primary"):
+    if not user_query.strip():
+        str_ui.error("Operational Block: Target inquiry text buffer cannot be empty.")
     else:
-        st.sidebar.markdown('<p style="color:#D97706; font-weight:bold; margin:0;">⚠ Engine Warmup In Progress...</p>', unsafe_allow_html=True)
-        engine_ready = False
-except Exception:
-    st.sidebar.markdown('<p style="color:#DC2626; font-weight:bold; margin:0;">○ Backend Node Offline</p>', unsafe_allow_html=True)
-    engine_ready = False
-
-user_role = st.sidebar.selectbox("Assigned Auditor Role", ["compliance_auditor", "guest_researcher"])
-
-# --- USER QUERY PASS ---
-user_query = st.text_input("", value="show me internal data", label_visibility="collapsed")
-
-if st.button("Execute Async Audit Sequence", disabled=not engine_ready):
-    if user_query.strip():
-        payload = {"question": user_query, "role": user_role}
-        
-        with st.spinner("Processing..."):
+        with str_ui.spinner("Orchestrating multi-agent async retrieval loops and validation layers..."):
+            payload = {
+                "question": user_query.strip(),
+                "role": user_role
+            }
+            
+            # Start strict latency timing capture
+            start_marker = time.time()
             try:
-                response = requests.post("http://127.0.0.1:8000/api/v1/query", json=payload)
+                response = requests.post(
+                    f"{API_BASE_URL}/api/v1/query",
+                    json=payload,
+                    timeout=None  # Allow local generation loops time to complete naturally
+                )
+                str_ui.session_state.execution_latency = time.time() - start_marker
+                str_ui.session_state.status_code = response.status_code
                 
-                # Case 1: Clean Verification Path
+                # Capture standard response matrices or security blocking payloads
                 if response.status_code == 200:
-                    api_data = response.json()
-                    st.markdown('<p class="success-banner">Audit report finalized cleanly.</p>', unsafe_allow_html=True)
-                    st.markdown('<p class="report-header">📄 Finalized Compliance Report</p>', unsafe_allow_html=True)
-                    st.markdown('<p class="report-sub-caption">The responses below were synthesized under zero-tolerance constraints using strictly isolated, verified local document contexts.</p>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="report-body">{api_data.get("response")}</div>', unsafe_allow_html=True)
-                    
-                # Case 2: Financial Governance Interception Path (HTTP 403)
+                    str_ui.session_state.final_report = response.json().get("response", "No data returned.")
                 elif response.status_code == 403:
-                    api_data = response.json()
-                    st.markdown('<p class="success-banner" style="color:#B91C1C;">Audit report finalized cleanly.</p>', unsafe_allow_html=True)
-                    st.markdown('<p class="report-header" style="color:#B91C1C;">📄 Finalized Compliance Report</p>', unsafe_allow_html=True)
-                    st.markdown('<p class="report-sub-caption">The responses below were synthesized under zero-tolerance constraints using strictly isolated, verified local document contexts.</p>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="security-body">{api_data.get("response")}</div>', unsafe_allow_html=True)
-                    
-                # Case 3: Error Pass
+                    # Capture security block reasons directly from the exception middleware
+                    error_payload = response.json()
+                    str_ui.session_state.final_report = error_payload.get("response", "Access Denied by guardrails.")
                 else:
-                    st.markdown(f'<div class="security-body" style="color:#D97706;">Query processed. Check terminal logs or pass result back. Error Code: {response.status_code}</div>', unsafe_allow_html=True)
+                    str_ui.session_state.final_report = f"Pipeline Processing Failure. Status Code: {response.status_code}"
                     
             except Exception as e:
-                st.markdown('<div class="security-body" style="color:#D97706;">Query processed. Check terminal logs or pass result back.</div>', unsafe_allow_html=True)
+                str_ui.session_state.execution_latency = time.time() - start_marker
+                str_ui.session_state.status_code = 500
+                str_ui.session_state.final_report = f"API Gate Connection Error: Failed to hit ingestion engine. Detail: {str(e)}"
+
+str_ui.markdown("---")
+
+# ─── DISPLAY RESULTS & INLINE METRICS ───
+if str_ui.session_state.final_report:
+    str_ui.subheader("📄 Finalized Compliance Report")
+    
+    # Check if the output contains a security violation signature or standard success
+    if str_ui.session_state.status_code == 403:
+        str_ui.error(str_ui.session_state.final_report)
+    elif str_ui.session_state.status_code == 200:
+        str_ui.info("The responses below were synthesized under zero-tolerance constraints using strictly isolated, verified local document contexts.")
+        str_ui.write(str_ui.session_state.final_report)
+    else:
+        str_ui.warning(str_ui.session_state.final_report)
+        
+    str_ui.markdown("---")
+    
+    # 3. Execution Latency Metrics rendering explicitly at the BOTTOM of the visual viewport
+    if str_ui.session_state.execution_latency is not None:
+        str_ui.subheader("📊 Performance Observability Logs")
+        col1, col2 = str_ui.columns(2)
+        with col1:
+            str_ui.metric(
+                label="System Ingress-to-Egress Latency",
+                value=f"{str_ui.session_state.execution_latency:.3f} seconds",
+                delta="Cached Match" if str_ui.session_state.execution_latency < 1.0 else "Cold Compute Gen"
+            )
+        with col2:
+            status_text = "SUCCESS (200 OK)" if str_ui.session_state.status_code == 200 else "BLOCKED (403 FORBIDDEN)"
+            str_ui.metric(
+                label="FastAPI Protocol Handshake Status",
+                value=status_text
+            )

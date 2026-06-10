@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     LLM_MODEL: str = "qwen2.5:1.5b"  # For heavy synthesis answering
     EMBED_MODEL_NAME: str = "BAAI/bge-small-en-v1.5"
-    ROUTER_MODEL: str = "llama3.2:1b"  # For lightning-fast query splitting
+    ROUTER_MODEL: str = "qwen2.5:0.5b"  # For lightning-fast query splitting
     
     # Local Storage & Vector Database (Embedded Mode - No Docker Needed!)
     QDRANT_PATH: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "qdrant_storage")

@@ -31,7 +31,10 @@ class QueryResponse(BaseModel):
 
 @app.exception_handler(FinancialGovernanceViolation)
 async def governance_violation_handler(request: Request, exc: FinancialGovernanceViolation):
-    """Global interceptor translating internal system faults into standard HTTP 403 Forbidden."""
+    """
+    Global interceptor translating internal system faults into standard HTTP 403 Forbidden.
+    Unified payload structure ensures downstream consumers parse the response key seamlessly.
+    """
     logger.warning(f"Financial Governance Guardrail triggered: {exc.message}")
     return JSONResponse(
         status_code=403,
@@ -66,6 +69,7 @@ async def execute_compliance_query(payload: QueryRequest):
     
     logger.info(f"Received API request for role: {payload.role.upper()}")
     try:
+        # Awaits the fully non-blocking asynchronous pipeline query execution sequence
         final_answer = await rag_pipeline.query(user_question=payload.question, user_role=payload.role)
         return QueryResponse(status="success", response=final_answer)
     except FinancialGovernanceViolation:
