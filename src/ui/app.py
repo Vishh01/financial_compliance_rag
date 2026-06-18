@@ -30,7 +30,6 @@ with str_ui.sidebar:
     str_ui.markdown("---")
     str_ui.subheader("⚙️ Vector Engine Monitor")
     
-    # Live health handshake checking system state
     try:
         health_response = requests.get(f"{API_BASE_URL}/health", timeout=2)
         if health_response.status_code == 200 and health_response.json().get("status") == "healthy":
@@ -84,45 +83,54 @@ if str_ui.button("Execute Compliance Evaluation Sequence", type="primary"):
     if not user_query.strip():
         str_ui.error("Operational Block: Target inquiry text buffer cannot be empty.")
     else:
-        with str_ui.spinner("Orchestrating multi-agent async retrieval loops and validation layers..."):
-            payload = {
-                "question": user_query.strip(),
-                "role": user_role
-            }
-            
-            # Start strict latency timing capture
-            start_marker = time.time()
-            try:
-                response = requests.post(
-                    f"{API_BASE_URL}/api/v1/query",
-                    json=payload,
-                    timeout=None  # Allow local generation loops time to complete naturally
-                )
-                str_ui.session_state.execution_latency = time.time() - start_marker
-                str_ui.session_state.status_code = response.status_code
+        # Clear previous state on new execution runs
+        str_ui.session_state.final_report = None
+        str_ui.session_state.execution_latency = None
+        str_ui.session_state.status_code = None
+        
+        # Use an explicit placeholder container to cleanly control rendering scopes
+        status_container = str_ui.empty()
+        
+        with status_container.container():
+            with str_ui.spinner("Orchestrating multi-agent async retrieval loops and validation layers..."):
+                payload = {
+                    "question": user_query.strip(),
+                    "role": user_role
+                }
                 
-                # Capture standard response matrices or security blocking payloads
-                if response.status_code == 200:
-                    str_ui.session_state.final_report = response.json().get("response", "No data returned.")
-                elif response.status_code == 403:
-                    # Capture security block reasons directly from the exception middleware
-                    error_payload = response.json()
-                    str_ui.session_state.final_report = error_payload.get("response", "Access Denied by guardrails.")
-                else:
-                    str_ui.session_state.final_report = f"Pipeline Processing Failure. Status Code: {response.status_code}"
+                start_marker = time.time()
+                try:
+                    response = requests.post(
+                        f"{API_BASE_URL}/api/v1/query",
+                        json=payload,
+                        timeout=None  # Allow local generation loops time to complete naturally
+                    )
                     
-            except Exception as e:
-                str_ui.session_state.execution_latency = time.time() - start_marker
-                str_ui.session_state.status_code = 500
-                str_ui.session_state.final_report = f"API Gate Connection Error: Failed to hit ingestion engine. Detail: {str(e)}"
+                    # Store variables directly into persistent storage states
+                    str_ui.session_state.execution_latency = time.time() - start_marker
+                    str_ui.session_state.status_code = response.status_code
+                    
+                    if response.status_code == 200:
+                        str_ui.session_state.final_report = response.json().get("response", "No data returned.")
+                    elif response.status_code == 403:
+                        str_ui.session_state.final_report = response.json().get("response", "Access Denied by guardrails.")
+                    else:
+                        str_ui.session_state.final_report = f"Pipeline Processing Failure. Status Code: {response.status_code}"
+                        
+                except Exception as e:
+                    str_ui.session_state.execution_latency = time.time() - start_marker
+                    str_ui.session_state.status_code = 500
+                    str_ui.session_state.final_report = f"API Gate Connection Error: Failed to hit ingestion engine. Detail: {str(e)}"
+        
+        # Force-clear the visual loading spinner from the screen immediately following execution
+        status_container.empty()
 
 str_ui.markdown("---")
 
-# ─── DISPLAY RESULTS & INLINE METRICS ───
-if str_ui.session_state.final_report:
+# ─── DISPLAY RESULTS & INLINE METRICS (ISOLATED FROM THE BUTTON LIFECYCLE) ───
+if str_ui.session_state.final_report is not None:
     str_ui.subheader("📄 Finalized Compliance Report")
     
-    # Check if the output contains a security violation signature or standard success
     if str_ui.session_state.status_code == 403:
         str_ui.error(str_ui.session_state.final_report)
     elif str_ui.session_state.status_code == 200:
@@ -133,7 +141,6 @@ if str_ui.session_state.final_report:
         
     str_ui.markdown("---")
     
-    # 3. Execution Latency Metrics rendering explicitly at the BOTTOM of the visual viewport
     if str_ui.session_state.execution_latency is not None:
         str_ui.subheader("📊 Performance Observability Logs")
         col1, col2 = str_ui.columns(2)
