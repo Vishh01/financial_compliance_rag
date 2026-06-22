@@ -2,6 +2,7 @@ import logging
 import json
 import time
 import asyncio
+import re
 import httpx
 from qdrant_client import QdrantClient
 
@@ -29,18 +30,32 @@ class AsyncComplianceRAGPipeline:
         logger.info(f"Async worker spawned for target: '{sub_query}'")
         # return self.retriever.retrieve_context(query=sub_query, user_role=user_role, limit=1)
         """keep the smart, decoupled search strategy but finally allow your operating system to distribute those heavy matrix operations across your CPU cores at the same time."""
-        return await asyncio.to_thread(self.retriever.retrieve_context, query=sub_query, user_role=user_role, limit=1)
+        return await asyncio.to_thread(self.retriever.retrieve_context, query=sub_query, user_role=user_role, limit=2)
 
-    async def query(self, user_question: str, user_role: str = "compliance_auditor") -> str:
+    async def query(self, user_question: str, user_role: str = "compliance_auditor", bypass_cache: bool = False) -> str:
         print(f"\n--- Processing Ingress Query [Role: {user_role.upper()}] ---")
         start_time = time.time()
         
         # --- ✅ STEP 1: ACTIVE SEMANTIC CACHE LOOKUP ---
         # Intercepts recurring query patterns under sub-100ms latency metrics
-        cached_answer = self.cache.check_cache(user_question, user_role)
-        if cached_answer:
-            logger.info("Fulfilling transaction request using validated warm memory records.")
-            return cached_answer
+        if not bypass_cache:
+            cached_answer = self.cache.check_cache(user_question, user_role)
+            if cached_answer:
+                logger.info("Fulfilling transaction request using validated warm memory records.")
+                return cached_answer
+        else:
+            logger.info("🔄 Cache bypass active. Forcing cold vector extraction path...")
+            
+    # async def query(self, user_question: str, user_role: str = "compliance_auditor") -> str:
+    #     print(f"\n--- Processing Ingress Query [Role: {user_role.upper()}] ---")
+    #     start_time = time.time()
+        
+    #     # --- ✅ STEP 1: ACTIVE SEMANTIC CACHE LOOKUP ---
+    #     # Intercepts recurring query patterns under sub-100ms latency metrics
+    #     cached_answer = self.cache.check_cache(user_question, user_role)
+    #     if cached_answer:
+    #         logger.info("Fulfilling transaction request using validated warm memory records.")
+    #         return cached_answer
 
         # --- STEP 2: ASYNCHRONOUS DECONSTRUCTION ---
         # Splits compound inquiries into isolated query arrays
@@ -79,24 +94,28 @@ class AsyncComplianceRAGPipeline:
         if not aggregated_context_chunks:
             return f"No matching context found for the provided query filters under role profile: {user_role.upper()}."
 
-        # --- STEP 4: STRUCTURAL ASSEMBLY LAYER WITH ISOLATION BOUNDARIES ---
+        # --- STEP 4: HARDENED ASSEMBLY WITH TEXT COMPACTING ---
         formatted_context_blocks = []
         for idx, c in enumerate(aggregated_context_chunks):
-            source_doc = c.get("file_name") or c.get("source") or "Unknown_Compliance_Document.pdf"
+            source_doc = c.get("file_name") or c.get("source") or "Unknown_Doc.pdf"
             page_number = c.get("page_label") or c.get("page") or "N/A"
-            
-            # If retriever.py already wrapped the metadata inside the text block, 
-            # extract it cleanly or fallback to the raw text field.
-            raw_text_data = c.get("text", "")
+            text_data = c.get("text", "")
+
+            # COMPACTION GUARDRAIL: Collapse repeating newlines/spaces common in tables
+            compacted_text = re.sub(r'\n\s*\n', '\n', text_data)
+            compacted_text = re.sub(r' {2,}', ' ', compacted_text)
+
+            # Cap the maximum character window per stitched block to protect CPU attention
+            if len(compacted_text) > 4000:
+                compacted_text = compacted_text[:4000] + "\n[... Context truncated by generator guardrail to preserve attention map ...]"
 
             block = (
                 f"\n===========================================\n"
                 f"=== VERIFIED AUDIT DATA LAYER [{idx + 1}] ===\n"
-                f"SOURCE FILE DISCLOSURE: {source_doc}\n"
-                f"DOCUMENT PAGE TARGET: {page_number}\n"
-                f"--- START SOURCE CHUNK TEXT ---\n"
-                f"{raw_text_data}\n"
-                f"--- END SOURCE CHUNK TEXT ---\n"
+                f"SOURCE FILE: {source_doc} | PAGE: {page_number}\n"
+                f"--- START SOURCE TEXT ---\n"
+                f"{compacted_text}\n"
+                f"--- END SOURCE TEXT ---\n"
                 f"===========================================\n\n"
             )
             formatted_context_blocks.append(block)
@@ -105,16 +124,26 @@ class AsyncComplianceRAGPipeline:
 
         # --- STEP 5: STRICT GOVERNANCE PROMPT SYSTEM INJECTION ---
         system_prompt = (
+            # --- THE HARDENED GENERATOR PROMPT ASSEMBLY ---
             "You are an elite corporate financial compliance auditor.\n"
             "Synthesize a crisp, factual compliance response derived strictly from the provided context blocks below.\n\n"
+            
             "CRITICAL OPERATIONAL CONSTRAINTS:\n"
-            "1. ANCHORED CITATION VERIFICATION: Every factual assertion or metric must be immediately "
+            "1. NO CROSS-CONTAMINATION: You are reviewing multiple independent corporate disclosures simultaneously. "
+            "Ensure that metrics (such as net sales, revenues, or strategic definitions) found inside an Apple file are "
+            "NEVER cross-attributed or blended with NVIDIA metrics, and vice versa. Keep corporate entities entirely separated.\n"
+            "2. ANCHORED CITATION VERIFICATION: Every factual assertion or metric must be immediately "
             "followed by an explicit inline citation matching this layout: [FILE: source_name, PAGE: page_num].\n"
-            "2. ABSOLUTE CONTEXT GROUNDING: If the information requested is missing within the context blocks, "
-            "state explicitly: 'Information unavailable: Context lacks verified documentation.' Do not use parametric memory.\n"
-            "3. NO EXTRAPOLATION: Report raw facts exactly as stated without speculative assumptions.\n\n"
+            "3. ABSOLUTE CONTEXT GROUNDING: If the specific information requested for a corporate entity is missing within "
+            "the context blocks, state explicitly: 'Information unavailable: Context lacks verified documentation.' Do not use parametric memory.\n"
+            "4. NO EXTRAPOLATION: Report raw facts exactly as stated without speculative assumptions.\n\n"
+            
             "RESPONSE FORMAT MANDATE:\n"
-            "Keep your response concise, factual, and direct. Conclude each key factual point with its respective [FILE: ..., PAGE: ...] tag."
+            "Keep your response concise, factual, and direct. Group your findings cleanly by corporation (e.g., Apple Inc. findings followed by NVIDIA Corporation findings). "
+            "Conclude each key factual point with its respective [FILE: ..., PAGE: ...] tag.\n\n"
+            f"PROVIDED AUDIT DATA CONTEXT:\n{formatted_context}\n\n"
+            f"USER INGRESS QUERY: {user_question}"
+        
         #     "You are an elite, zero-tolerance corporate financial compliance auditor operating within strict legal guidelines.\n"
         #     "Your explicit assignment is to synthesize a compliance response derived strictly from the provided context blocks below.\n\n"
         #     "CRITICAL OPERATIONAL CONSTRAINTS:\n"

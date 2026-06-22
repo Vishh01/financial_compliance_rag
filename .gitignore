@@ -16,3 +16,6 @@ Thumbs.db
 # Ignore Local Vector Database & Transformer Model Caches
 model_cache/
 qdrant_storage/
+
+# Local compliance metrics report runs
+local_compliance_report.csv
