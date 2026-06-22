@@ -1,4 +1,4 @@
-Markdown# Enterprise Financial Compliance RAG Pipeline
+# Enterprise Financial Compliance RAG Pipeline
 
 An asynchronous, privacy-first Retrieval-Augmented Generation (RAG) framework optimized for parsing and verifying dense corporate 10-K financial records (Apple Inc. & NVIDIA Corp.). 
 
@@ -54,14 +54,18 @@ financial_compliance_rag/
 ├── flush_cache.py                 # Administrative utility to clear stale Qdrant cache vectors
 └── local_compliance_report.csv    # Generated evaluation report matrix output
 
-🤖 Local AI Stack Requirements (Optimized for 6GB RAM)This system decouples processing stages into three specialized local micro-models to protect your system from memory thrashing:
-Pipeline Component Layer    Model Target Specification      Size on Disk        Operational Role
+---
+
+## 🤖 Local AI Stack Requirements (Optimized for 6GB RAM)
+
+This system decouples processing stages into three specialized local micro-models to protect your system from memory thrashing:
+**Pipeline Component Layer    Model Target Specification      Size on Disk        Operational Role**
 Operational Generation      qwen2.5:1.5b                    ~986 MB             Handles complex text synthesis, prompt templates, and citation formatting.
 Intelligent Routing         qwen2.5:0.5b                    ~390 MB             Powers lightning-fast query deconstruction and splitting on raw CPU cycles.
 Vector Space Embeddings     BAAI/bge-small-en-v1.5          ~130 MB             Computes high-precision financial text embeddings natively.
 
 
-Pulling the Weights via OllamaEnsure you have Ollama installed locally. 
+**Pulling the Weights via OllamaEnsure you have Ollama installed locally.** 
 Open your command shell terminal and download the required inference layers to your machine:
 Bash
 # Pull the core synthesis text generation engine
@@ -71,7 +75,7 @@ ollama pull qwen2.5:1.5b
 ollama pull qwen2.5:0.5b
 Note: Your vector workspace natively handles the loading and optimization weights for the BAAI/bge-small-en-v1.5 transformer array during database indexing loops.
 
-⚡ Step-by-Step Environment SetupFollow these steps to configure your virtual machine environment and run the pipeline locally:
+## ⚡ Step-by-Step Environment SetupFollow these steps to configure your virtual machine environment and run the pipeline locally:
 1. Initialize the Workspace Scope & Virtual EnvironmentOpen your command terminal inside your project directory and run:
 Bash
 # Navigate to your local project directory path
