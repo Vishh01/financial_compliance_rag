@@ -59,25 +59,26 @@ financial_compliance_rag/
 ## 🤖 Local AI Stack Requirements (Optimized for 6GB RAM)
 
 This system decouples processing stages into three specialized local micro-models to protect your system from memory thrashing:
-**Pipeline Component Layer    Model Target Specification      Size on Disk        Operational Role**
-Operational Generation      qwen2.5:1.5b                    ~986 MB             Handles complex text synthesis, prompt templates, and citation formatting.
-Intelligent Routing         qwen2.5:0.5b                    ~390 MB             Powers lightning-fast query deconstruction and splitting on raw CPU cycles.
-Vector Space Embeddings     BAAI/bge-small-en-v1.5          ~130 MB             Computes high-precision financial text embeddings natively.
+**|Pipeline Component Layer  |  Model Target Specification  |    Size on Disk   |     Operational Role|**
+|Operational Generation     | qwen2.5:1.5b                  |  ~986 MB          |   Handles complex text synthesis, prompt templates, and citation formatting.|
+|Intelligent Routing        | qwen2.5:0.5b            |        ~390 MB          |   Powers lightning-fast query deconstruction and splitting on raw CPU cycles.|
+|Vector Space Embeddings    | BAAI/bge-small-en-v1.5        |  ~130 MB          |   Computes high-precision financial text embeddings natively.|
 
 
-**Pulling the Weights via OllamaEnsure you have Ollama installed locally.** 
+### Pulling the Weights via Ollama
+Ensure you have Ollama installed locally. 
 Open your command shell terminal and download the required inference layers to your machine:
-Bash
+```Bash
 # Pull the core synthesis text generation engine
 ollama pull qwen2.5:1.5b
 
 # Pull the lightweight query-splitting router model
 ollama pull qwen2.5:0.5b
 Note: Your vector workspace natively handles the loading and optimization weights for the BAAI/bge-small-en-v1.5 transformer array during database indexing loops.
-
+```
 ## ⚡ Step-by-Step Environment SetupFollow these steps to configure your virtual machine environment and run the pipeline locally:
 1. Initialize the Workspace Scope & Virtual EnvironmentOpen your command terminal inside your project directory and run:
-Bash
+```Bash
 # Navigate to your local project directory path
 cd /d :Project\financial_compliance_rag
 
@@ -86,30 +87,38 @@ python -m venv venv
 
 # Activate the virtual environment frame
 venv\Scripts\activate
+```
 
-2. Configure Local Settings Manifest (config/settings.py)Ensure your internal pipeline context loads your specific local hardware registry parameters:Python# Local AI Stack Components (Optimized for 6GB RAM)
+2. Configure Local Settings Manifest (config/settings.py)
+Ensure your internal pipeline context loads your specific local hardware registry parameters:
+```bash
+# Local AI Stack Components (Optimized for 6GB RAM)
 OLLAMA_BASE_URL: str = "http://localhost:11434"
 LLM_MODEL: str = "qwen2.5:1.5b"          # For heavy synthesis answering
 ROUTER_MODEL: str = "qwen2.5:0.5b"       # For lightning-fast query splitting
 EMBED_MODEL_NAME: str = "BAAI/bge-small-en-v1.5"
+```
 
-3. Install Project DependenciesVerify that your local requirements.txt file is saved in the root folder, then run the installation command:
-Bash
+3. Install Project Dependencies
+Verify that your local requirements.txt file is saved in the root folder, then run the installation command:
+```Bash
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+```
 
 4. Administrative Step: Purging/Flushing Stale Semantic Cache Records
 If your evaluation suite returns outdated figures or you need to reset the system's warm memory vectors back to a clean state, execute the hardcoded cache eviction utility script:
 
-Bash
+```Bash
 python flush_cache.py
-
+```
 This command targets your local Qdrant collection database directly, deleting stale entry indices safely without impacting any structural source documents.
 
 5. Running the Local Evaluation Suite
 Execute the metrics tracking matrix using the terminal path shortcut:
-Bash
+```Bash
 python -m src.evaluation.local_evaluate
+```
 
 📊 Sample Execution Log ReportPlaintext🚀 Initializing 100% Local CPU Evaluation Stream...
 📦 Hardware Profile: Optimized for 6GB RAM / Pure CPU Context
