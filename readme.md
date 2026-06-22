@@ -9,7 +9,8 @@ This architecture is specifically engineered to deliver production-grade perform
 ## 🏗️ Technical Architecture Highlights
 
 - **Multi-Threaded Asynchronous Retrieval:** Utilizes Python's `asyncio` engine to distribute heavy database lookups across background worker threads, preventing CPU stalling.
-- **Dynamic Semantic Caching:** Integrates an fast cache lookup gate within Qdrant to intercept repeating compliance requests in under a millisecond.
+- **Dynamic Semantic Caching:** Integrates a fast cache lookup gate within Qdrant to intercept repeating compliance requests in under a millisecond.
+- **Cache Eviction Utility:** Includes a dedicated administrative script to flush stale vector collections without modifying production code.
 - **Three-Tier Local AI Stack:** Decouples heavy financial text synthesis, query splitting routing, and dense token embeddings to maximize matrix computation speeds on minimal memory footprints.
 - **Local Verification Suite:** Avoids memory-heavy deep-learning evaluation tools by utilizing a deterministic programmatic matrix to track factual precision.
 
@@ -53,8 +54,7 @@ financial_compliance_rag/
 ├── requirements.txt               # Locked project dependency manifest
 ├── flush_cache.py                 # Administrative utility to clear stale Qdrant cache vectors
 └── local_compliance_report.csv    # Generated evaluation report matrix output
-
----
+```
 
 ## 🤖 Local AI Stack Requirements (Optimized for 6GB RAM)
 
